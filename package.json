@@ -3,10 +3,11 @@
   "version": "1.0.0",
   "description": "An MCP server for Azure DevOps search tools",
   "main": "dist/index.js",
+  "type": "module",
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts",
+    "dev": "ts-node --esm src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -22,8 +23,10 @@
     "typescript": "^5.8.2"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.8.0",
     "axios": "^1.8.4",
     "azure-devops-node-api": "^14.1.0",
-    "dotenv": "^16.0.0"
+    "dotenv": "^16.0.0",
+    "zod": "^3.24.2"
   }
 }

@@ -1,17 +1,31 @@
 import * as azdev from 'azure-devops-node-api';
 import axios from 'axios';
-import { WikiSearchRequest, WikiSearchResult, CodeSearchRequest, CodeSearchResult } from '../types';
+import { 
+  WikiSearchInput, 
+  CodeSearchInput, 
+  WikiSearchResult, 
+  CodeSearchResult, 
+  WikiSearchApiResponse, 
+  WikiSearchApiResult,
+  CodeSearchApiRequest,
+  CodeSearchApiResponse 
+} from '../types/index.js';
+import { SearchLogger } from './logging/search-logger.service.js';
 
 export class AzureDevOpsService {
   private orgUrl: string;
+  private searchUrl: string;
   private token: string;
   private project: string;
   private connection: azdev.WebApi;
+  private logger: SearchLogger;
 
   constructor() {
     this.orgUrl = process.env.AZURE_DEVOPS_ORG_URL || '';
+    this.searchUrl = this.orgUrl.replace('dev.azure.com', 'almsearch.dev.azure.com');
     this.token = process.env.AZURE_DEVOPS_PAT || '';
     this.project = process.env.AZURE_DEVOPS_PROJECT || '';
+    this.logger = new SearchLogger();
 
     if (!this.orgUrl || !this.token) {
       throw new Error('Azure DevOps organization URL and personal access token are required');
@@ -25,8 +39,11 @@ export class AzureDevOpsService {
   /**
    * Search for content in Azure DevOps wiki
    */
-  async searchWiki(request: WikiSearchRequest): Promise<WikiSearchResult[]> {
+  async searchWiki(request: WikiSearchInput): Promise<WikiSearchResult[]> {
     try {
+      // Log the search request
+      await this.logger.logWikiSearch(request);
+
       const projectName = request.project || this.project;
       const maxResults = request.maxResults || 10;
       
@@ -35,15 +52,18 @@ export class AzureDevOpsService {
       }
 
       // Using Azure DevOps REST API for wiki search
-      const url = `${this.orgUrl}/${projectName}/_apis/search/wikisearchresults?api-version=7.0`;
-      const response = await axios.post(
+      const url = `${this.searchUrl}/${projectName}/_apis/search/wikisearchresults?api-version=7.1`;
+      const response = await axios.post<WikiSearchApiResponse>(
         url,
         {
           searchText: request.query,
+          $skip: request.skip || 0,
           $top: maxResults,
           filters: {
-            projectName: [projectName]
-          }
+            Project: projectName ? [projectName] : undefined
+          },
+          $orderBy: null,
+          includeFacets: request.includeFacets ?? true
         },
         {
           headers: {
@@ -54,32 +74,39 @@ export class AzureDevOpsService {
       );
 
       // Transform the response into WikiSearchResult[]
-      const results: WikiSearchResult[] = [];
-      
-      if (response.data && response.data.results) {
-        for (const item of response.data.results) {
-          results.push({
-            id: item.id || `wiki-${results.length}`,
-            title: item.fileName || 'Unknown',
-            content: item.content || item.highlights || '',
-            path: item.path || '',
-            url: `${this.orgUrl}/${projectName}/_wiki/wikis/${item.collection?.name || 'ProjectWiki'}/${item.path || ''}`
-          });
-        }
-      }
+      return response.data.results.map((item: WikiSearchApiResult) => {
+        // Extract content from hits if available
+        const contentHit = item.hits.find((hit: { fieldReferenceName: string; highlights: string[] }) => 
+          hit.fieldReferenceName === 'content'
+        );
+        const content = contentHit ? this.stripHighlightTags(contentHit.highlights[0]) : '';
 
-      return results;
+        return {
+          id: item.contentId,
+          title: item.fileName,
+          content,
+          path: item.path,
+          url: `${this.orgUrl}/${projectName}/_wiki/wikis/${item.collection.name}${item.path}`
+        };
+      });
     } catch (error) {
-      console.error('Error searching wiki:', error);
+      await this.logger.logError(error);
       throw error;
     }
+  }
+
+  private stripHighlightTags(text: string): string {
+    return text.replace(/<highlighthit>/g, '').replace(/<\/highlighthit>/g, '');
   }
 
   /**
    * Search for code in Azure DevOps repositories
    */
-  async searchCode(request: CodeSearchRequest): Promise<CodeSearchResult[]> {
+  async searchCode(request: CodeSearchInput): Promise<CodeSearchResult[]> {
     try {
+      // Log the search request
+      await this.logger.logCodeSearch(request);
+
       const projectName = request.project || this.project;
       const maxResults = request.maxResults || 10;
       
@@ -88,28 +115,63 @@ export class AzureDevOpsService {
       }
 
       // Using Azure DevOps REST API for code search
-      const url = `${this.orgUrl}/${projectName}/_apis/search/codesearchresults?api-version=7.0`;
+      const url = `${this.searchUrl}/${projectName}/_apis/search/codesearchresults?api-version=7.1`;
       
-      // Build the request body
-      const requestBody: any = {
+      // Build the API request body according to the API specification
+      const requestBody: CodeSearchApiRequest = {
         searchText: request.query,
+        $skip: request.skip || 0,
         $top: maxResults,
         filters: {
-          project: [projectName]
-        }
+          Project: [projectName]
+        },
+        includeFacets: request.includeFacets ?? true,
+        $orderBy: [{
+          field: 'filename',
+          sortOrder: 'ASC'
+        }]
       };
 
       // Add repository filter if specified
       if (request.repository) {
-        requestBody.filters.repository = [request.repository];
+        requestBody.filters = {
+          ...requestBody.filters,
+          Repository: [request.repository]
+        };
       }
 
+      // Add branch filter if specified
+      if (request.branch) {
+        requestBody.filters = {
+          ...requestBody.filters,
+          Branch: [request.branch]
+        };
+      }
+
+      // Add path filter if specified
+      if (request.path) {
+        requestBody.filters = {
+          ...requestBody.filters,
+          Path: [request.path]
+        };
+      }
       // Add file extension filter if specified
-      if (request.fileExtensions && request.fileExtensions.length > 0) {
-        requestBody.filters.extension = request.fileExtensions;
+      else if (request.fileExtensions && request.fileExtensions.length > 0) {
+        requestBody.filters = {
+          ...requestBody.filters,
+          Path: request.fileExtensions.map(ext => `**/*.${ext}`)
+        };
       }
 
-      const response = await axios.post(
+      // Add code element filter if specified
+      if (request.codeElements && request.codeElements.length > 0) {
+        requestBody.filters = {
+          ...requestBody.filters,
+          CodeElement: request.codeElements
+        };
+      }
+
+      const response = await axios.post<CodeSearchApiResponse>(
         url,
         requestBody,
         {
@@ -120,30 +182,29 @@ export class AzureDevOpsService {
         }
       );
 
-      // Transform the response into CodeSearchResult[]
-      const results: CodeSearchResult[] = [];
-      
-      if (response.data && response.data.results) {
-        for (const item of response.data.results) {
-          const matches = item.matches?.map((match: any) => ({
-            line: match.lineNumber || 0,
-            content: match.content || ''
-          })) || [];
+      // Transform the API response into CodeSearchResult[]
+      return response.data.results.map((item: CodeSearchApiResponse['results'][0]) => {
+        // Add proper null checks for matches
+        const contentMatches = item.matches?.content || [];
+        const matches = contentMatches.map((match) => ({
+          line: 0, // API doesn't provide line numbers directly
+          content: `Match at offset ${match.charOffset} with length ${match.length}`
+        }));
 
-          results.push({
-            repository: item.repository?.name || 'Unknown',
-            path: item.path || '',
-            fileName: item.fileName || 'Unknown',
-            content: item.content || '',
-            url: `${this.orgUrl}/${projectName}/_git/${item.repository?.name || ''}?path=${encodeURIComponent(item.path || '')}`,
-            matches
-          });
-        }
-      }
-
-      return results;
+        const repoName = item.repository?.name || 'Unknown';
+        const filePath = item.path || '';
+        
+        return {
+          repository: repoName,
+          path: filePath,
+          fileName: item.fileName || 'Unknown',
+          content: '', // API response doesn't include the actual content
+          url: `${this.orgUrl}/${projectName}/_git/${repoName}?path=${encodeURIComponent(filePath)}`,
+          matches
+        };
+      });
     } catch (error) {
-      console.error('Error searching code:', error);
+      await this.logger.logError(error);
       throw error;
     }
   }

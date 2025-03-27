@@ -16,27 +16,34 @@ export interface McpResponse {
   jsonrpc?: string;
 }
 
-// Azure DevOps specific types
-export interface WikiSearchRequest {
-  query: string;
+interface WikiSearchInput {
+  query: string;  // This maps to searchText in the API
   project?: string;
-  maxResults?: number;
+  maxResults?: number;  // This maps to $top in the API
+  skip?: number;  // Optional parameter for pagination
+  includeFacets?: boolean;  // Optional parameter for including facets in response
 }
 
+interface CodeSearchInput {
+  query: string;
+  project?: string;
+  repository?: string;
+  fileExtensions?: string[];
+  maxResults?: number;
+  branch?: string;
+  path?: string;
+  codeElements?: Array<'class' | 'function' | 'variable' | 'comment'>;
+  skip?: number;
+  includeFacets?: boolean;
+}
+
+// Azure DevOps specific types
 export interface WikiSearchResult {
   id: string;
   title: string;
   content: string;
   path: string;
   url: string;
-}
-
-export interface CodeSearchRequest {
-  query: string;
-  project?: string;
-  repository?: string;
-  fileExtensions?: string[];
-  maxResults?: number;
 }
 
 export interface CodeSearchResult {
@@ -50,3 +57,118 @@ export interface CodeSearchResult {
     content: string;
   }>;
 }
+
+// Azure DevOps API specific types
+export interface WikiSearchApiResponse {
+  count: number;
+  results: WikiSearchApiResult[];
+  infoCode: number;
+  facets: {
+    Project: WikiSearchFacet[];
+    [key: string]: WikiSearchFacet[];
+  };
+}
+
+export interface WikiSearchApiResult {
+  fileName: string;
+  path: string;
+  collection: {
+    name: string;
+  };
+  project: {
+    id: string;
+    name: string;
+    visibility: string | null;
+  };
+  wiki: {
+    id: string;
+    mappedPath: string;
+    name: string;
+    version: string;
+  };
+  contentId: string;
+  hits: Array<{
+    fieldReferenceName: string;
+    highlights: string[];
+  }>;
+}
+
+export interface WikiSearchFacet {
+  name: string;
+  id: string;
+  resultCount: number;
+}
+
+// Azure DevOps Code Search API specific types
+export interface CodeSearchApiRequest {
+  searchText: string;
+  $skip?: number;
+  $top?: number;
+  filters?: {
+    Project?: string[];
+    Repository?: string[];
+    Path?: string[];
+    Branch?: string[];
+    CodeElement?: string[];
+  };
+  $orderBy?: Array<{
+    field: string;
+    sortOrder: 'ASC' | 'DESC';
+  }>;
+  includeFacets?: boolean;
+}
+
+export interface CodeSearchApiResponse {
+  count: number;
+  results: Array<{
+    fileName: string;
+    path: string;
+    matches: {
+      content?: Array<{
+        charOffset: number;
+        length: number;
+      }>;
+      fileName?: Array<{
+        charOffset: number;
+        length: number;
+      }>;
+    };
+    collection: {
+      name: string;
+    };
+    project: {
+      name: string;
+      id: string;
+    };
+    repository: {
+      name: string;
+      id: string;
+      type: string;
+    };
+    versions?: Array<{
+      branchName: string;
+      changeId: string;
+    }>;
+    contentId: string;
+  }>;
+  infoCode: number;
+  facets?: {
+    Project?: Array<{
+      name: string;
+      id: string;
+      resultCount: number;
+    }>;
+    Repository?: Array<{
+      name: string;
+      id: string;
+      resultCount: number;
+    }>;
+    CodeElement?: Array<{
+      name: string;
+      id: string;
+      resultCount: number;
+    }>;
+  };
+}
+
+export { WikiSearchInput, CodeSearchInput };

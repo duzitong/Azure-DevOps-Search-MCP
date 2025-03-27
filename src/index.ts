@@ -1,7 +1,9 @@
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
 import dotenv from 'dotenv';
-import { createInterface } from 'readline';
-import { McpRequest, McpResponse } from './types';
-import { AzureDevOpsService } from './services/azure-devops.service';
+import { AzureDevOpsService } from './services/azure-devops.service.js';
+import { CodeSearchInput } from './types/index.js';
 
 // Load environment variables
 dotenv.config();
@@ -9,157 +11,77 @@ dotenv.config();
 // Initialize Azure DevOps service
 const azureDevOpsService = new AzureDevOpsService();
 
-// Define MCP tools
-const tools = [
+// Create an MCP server
+const server = new McpServer({
+  name: process.env.PROJECT_FRIENDLY_NAME || "Azure DevOps Search MCP Server",
+  version: "1.0.0"
+});
+
+// Add Azure DevOps wiki search tool
+server.tool(
+  "azure_devops_wiki_search",
+  `Search for content within ${process.env.PROJECT_FRIENDLY_NAME || 'Azure DevOps'} wiki pages. Returns matching wiki pages with their titles, content snippets, paths, and URLs.`,
   {
-    name: 'azure_devops_wiki_search',
-    description: 'Search for content in Azure DevOps wiki',
-    parameters: {
-      type: 'object',
-      properties: {
-        query: {
-          type: 'string',
-          description: 'The search query'
-        },
-        project: {
-          type: 'string',
-          description: 'The Azure DevOps project name (optional if specified in environment variables)'
-        },
-        maxResults: {
-          type: 'number',
-          description: 'Maximum number of results to return (default: 10)'
-        }
-      },
-      required: ['query']
-    }
+    query: z.string().describe("The search query"),
+    project: z.string().optional().describe("The Azure DevOps project name (optional if specified in environment variables)"),
+    maxResults: z.number().optional().default(10).describe("Maximum number of results to return")
   },
+  async (args, extra) => {
+    const results = await azureDevOpsService.searchWiki({
+      query: args.query,
+      project: args.project,
+      maxResults: args.maxResults
+    });
+    return {
+      content: [{ 
+        type: "text", 
+        text: JSON.stringify(results, null, 2)
+      }]
+    };
+  }
+);
+
+// Add Azure DevOps code search tool
+server.tool(
+  "azure_devops_code_search",
+  `Search for code within ${process.env.PROJECT_FRIENDLY_NAME || 'Azure DevOps'} repositories. Returns matching code snippets with file paths, repository information, and direct URLs to the code.`,
   {
-    name: 'azure_devops_code_search',
-    description: 'Search for code in Azure DevOps repositories',
-    parameters: {
-      type: 'object',
-      properties: {
-        query: {
-          type: 'string',
-          description: 'The search query'
-        },
-        project: {
-          type: 'string',
-          description: 'The Azure DevOps project name (optional if specified in environment variables)'
-        },
-        repository: {
-          type: 'string',
-          description: 'The repository name to search in (optional)'
-        },
-        fileExtensions: {
-          type: 'array',
-          items: {
-            type: 'string'
-          },
-          description: 'File extensions to filter results (e.g., ["js", "ts"])'
-        },
-        maxResults: {
-          type: 'number',
-          description: 'Maximum number of results to return (default: 10)'
-        }
-      },
-      required: ['query']
-    }
-  }
-];
+    query: z.string().describe("The search query"),
+    project: z.string().optional().describe("The Azure DevOps project name (optional if specified in environment variables)"),
+    repository: z.string().optional().describe("The repository name to search in (optional)"),
+    fileExtensions: z.array(z.string()).optional().describe("File extensions to filter results (e.g., [\"js\", \"ts\"])"),
+    maxResults: z.number().optional().default(10).describe("Maximum number of results to return"),
+    branch: z.string().optional().describe("The branch to search in (e.g., 'master', 'main')"),
+    path: z.string().optional().describe("Path filter (e.g., '/src/**' to search in src folder)"),
+    codeElements: z.array(z.enum(['class', 'function', 'variable', 'comment'])).optional().describe("Types of code elements to search for"),
+    skip: z.number().optional().default(0).describe("Number of results to skip (for pagination)"),
+    includeFacets: z.boolean().optional().default(true).describe("Whether to include faceted search results")
+  },
+  async (args, extra) => {
+    // Convert the tool parameters to the format expected by the service
+    const searchInput: CodeSearchInput = {
+      query: args.query,
+      project: args.project,
+      repository: args.repository,
+      fileExtensions: args.fileExtensions,
+      maxResults: args.maxResults,
+      branch: args.branch,
+      path: args.path,
+      codeElements: args.codeElements,
+      skip: args.skip,
+      includeFacets: args.includeFacets
+    };
 
-// Handle MCP requests
-async function handleRequest(request: McpRequest): Promise<McpResponse> {
-  const toolName = request.inputs?.tool;
-  const response: McpResponse = { id: request.id };
-
-  try {
-    if (request.method === 'initialize') {
-      // Handle LSP initialize request
-      response.outputs = {
-        serverInfo: {
-          name: 'Azure DevOps Search MCP Server',
-          version: '1.0.0',
-          vendor: 'Custom MCP Implementation'
-        },
-        capabilities: {
-          tools,
-          textDocumentSync: 1, // None
-        }
-      };
-      // Send initialized notification
-      console.log(JSON.stringify({
-        method: 'initialized',
-        jsonrpc: '2.0'
-      }));
-      return response;
-    }
-
-    if (!request.inputs) {
-      throw new Error('Request inputs are required');
-    }
-
-    switch (toolName) {
-      case 'azure_devops_wiki_search':
-        const wikiResults = await azureDevOpsService.searchWiki({
-          query: request.inputs.query,
-          project: request.inputs.project,
-          maxResults: request.inputs.maxResults
-        });
-        response.outputs = { results: wikiResults };
-        break;
-        
-      case 'azure_devops_code_search':
-        const codeResults = await azureDevOpsService.searchCode({
-          query: request.inputs.query,
-          project: request.inputs.project,
-          repository: request.inputs.repository,
-          fileExtensions: request.inputs.fileExtensions,
-          maxResults: request.inputs.maxResults
-        });
-        response.outputs = { results: codeResults };
-        break;
-
-      default:
-        if (!request.method) {
-          throw new Error(`Tool not found: ${toolName}`);
-        }
-        // Handle other LSP methods silently
-        break;
-    }
-  } catch (error: any) {
-    console.error('Error processing request:', error);
-    response.error = {
-      message: error.message || 'An error occurred while processing the request',
-      details: error.stack
+    const results = await azureDevOpsService.searchCode(searchInput);
+    return {
+      content: [{ 
+        type: "text", 
+        text: JSON.stringify(results, null, 2)
+      }]
     };
   }
+);
 
-  return response;
-}
-
-// Set up stdin reader
-const rl = createInterface({
-  input: process.stdin,
-  output: process.stdout,
-  terminal: false
-});
-
-// Process each line from stdin
-rl.on('line', async (line) => {
-  try {
-    const request = JSON.parse(line) as McpRequest;
-    const response = await handleRequest(request);
-    console.log(JSON.stringify(response));
-  } catch (error: any) {
-    console.error('Error processing input:', error);
-    const errorResponse: McpResponse = {
-      id: 'error',
-      error: {
-        message: error.message || 'Failed to process input',
-        details: error.stack
-      }
-    };
-    console.log(JSON.stringify(errorResponse));
-  }
-});
+// Start receiving messages on stdin and sending messages on stdout
+const transport = new StdioServerTransport();
+await server.connect(transport);

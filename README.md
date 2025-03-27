@@ -7,15 +7,22 @@ A Model Context Protocol (MCP) server that provides tools for searching Azure De
 This MCP server provides two tools:
 
 1. **Azure DevOps Wiki Search** - Search for content in Azure DevOps wiki pages
-2. **Azure DevOps Code Search** - Search for code in Azure DevOps repositories
+2. **Azure DevOps Code Search** - Search for code in Azure DevOps repositories with support for:
+   - File type filtering
+   - Path-based search
+   - Code element search (classes, functions, variables)
+   - Branch-specific searches
+   - Repository filtering
 
 ## Setup
 
 ### Prerequisites
 
-- Node.js 14 or higher
+- Node.js 16 or higher
 - An Azure DevOps organization with access to the Wiki and Code Search APIs
-- A Personal Access Token (PAT) with appropriate permissions
+- A Personal Access Token (PAT) with the following permissions:
+  - Code (Read)
+  - Wiki (Read)
 
 ### Installation
 
@@ -45,52 +52,39 @@ This MCP server provides two tools:
    npm start
    ```
 
+   For development with hot-reload:
+   ```
+   npm run dev
+   ```
+
 ## API Usage
 
-The server follows the Model Context Protocol (MCP) specification for tools.
+The server implements the Model Context Protocol (MCP) specification version 1.8.0 for tools.
 
-### Available Endpoints
-
-- `GET /` - Server information
-- `GET /mcp/tools` - List available tools
-- `POST /mcp/tools/azure_devops_wiki_search` - Execute wiki search
-- `POST /mcp/tools/azure_devops_code_search` - Execute code search
-
-### Example Requests
+### Tool Parameters
 
 #### Wiki Search
-
-```json
-POST /mcp/tools/azure_devops_wiki_search
-Content-Type: application/json
-
-{
-  "id": "request-123",
-  "inputs": {
-    "query": "deployment guide",
-    "project": "MyProject",
-    "maxResults": 5
-  }
-}
-```
+- `query` (required): The search query
+- `project` (optional): The Azure DevOps project name
+- `maxResults` (optional): Maximum number of results to return (default: 10)
 
 #### Code Search
+- `query` (required): The search query
+- `project` (optional): The Azure DevOps project name
+- `repository` (optional): The repository name to search in
+- `branch` (optional): The branch to search in
+- `fileExtensions` (optional): Array of file extensions to filter results
+- `path` (optional): Path filter within repositories
+- `codeElements` (optional): Types of code elements to search for (class, function, variable, comment)
+- `maxResults` (optional): Maximum number of results to return (default: 10)
 
-```json
-POST /mcp/tools/azure_devops_code_search
-Content-Type: application/json
+## Dependencies
 
-{
-  "id": "request-456",
-  "inputs": {
-    "query": "function calculateTotal",
-    "project": "MyProject",
-    "repository": "web-application",
-    "fileExtensions": ["js", "ts"],
-    "maxResults": 5
-  }
-}
-```
+- @modelcontextprotocol/sdk: ^1.8.0
+- azure-devops-node-api: ^14.1.0
+- axios: ^1.8.4
+- dotenv: ^16.0.0
+- zod: ^3.24.2
 
 ## License
 
