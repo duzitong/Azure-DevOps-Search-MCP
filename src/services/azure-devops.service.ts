@@ -115,7 +115,7 @@ export class AzureDevOpsService {
       }
 
       // Using Azure DevOps REST API for code search
-      const url = `${this.searchUrl}/${projectName}/_apis/search/codesearchresults?api-version=7.1`;
+      const url = `${this.searchUrl}/_apis/search/codesearchresults?api-version=7.1`;
       
       // Build the API request body according to the API specification
       const requestBody: CodeSearchApiRequest = {
