@@ -78,6 +78,39 @@ The server implements the Model Context Protocol (MCP) specification version 1.8
 - `codeElements` (optional): Types of code elements to search for (class, function, variable, comment)
 - `maxResults` (optional): Maximum number of results to return (default: 10)
 
+## VS Code Configuration
+
+To enable this MCP server in VS Code, add the following configuration to your workspace's `.vscode/mcp.json` file:
+
+```json
+{
+    "inputs": [],
+    "servers": {
+        "ado-search": {
+            "command": "node",
+            "args": [
+                "${workspaceFolder}/dist/index.js"
+            ],
+            "env": {
+                "AZURE_DEVOPS_ORG_URL": "https://dev.azure.com/your-organization",
+                "AZURE_DEVOPS_PROJECT": "your-project",
+                "AZURE_DEVOPS_PAT": "your-personal-access-token",
+                "PROJECT_FRIENDLY_NAME": "Your Project Name",
+                "LOG_DIR": "${workspaceFolder}/logs"
+            }
+        }
+    }
+}
+```
+
+Replace the following values with your own:
+- `your-organization`: Your Azure DevOps organization name
+- `your-project`: Your Azure DevOps project name
+- `your-personal-access-token`: Your Azure DevOps Personal Access Token
+- `Your Project Name`: A friendly name for your project (used in logs and messages)
+
+The server will be automatically detected by VS Code's MCP support and its search tools will become available.
+
 ## Dependencies
 
 - @modelcontextprotocol/sdk: ^1.8.0
