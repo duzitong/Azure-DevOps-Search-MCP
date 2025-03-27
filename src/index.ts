@@ -20,7 +20,7 @@ const server = new McpServer({
 // Add Azure DevOps wiki search tool
 server.tool(
   "azure_devops_wiki_search",
-  `Search for content within ${process.env.PROJECT_FRIENDLY_NAME || 'Azure DevOps'} wiki pages. Returns matching wiki pages with their titles, content snippets, paths, and URLs.`,
+  `Online search for content within ${process.env.PROJECT_FRIENDLY_NAME || 'Azure DevOps'} wiki pages. Returns matching wiki pages with their titles, content snippets, paths, and URLs.`,
   {
     query: z.string().describe("The search query"),
     project: z.string().optional().describe("The Azure DevOps project name (optional if specified in environment variables)"),
@@ -44,7 +44,7 @@ server.tool(
 // Add Azure DevOps code search tool
 server.tool(
   "azure_devops_code_search",
-  `Search for code within ${process.env.PROJECT_FRIENDLY_NAME || 'Azure DevOps'} repositories. Returns matching code snippets with file paths, repository information, and direct URLs to the code.`,
+  `Online search for code within ${process.env.PROJECT_FRIENDLY_NAME || 'Azure DevOps'} repositories. Returns matching code snippets with file paths, repository information, and direct URLs to the code.`,
   {
     query: z.string().describe("The search query"),
     project: z.string().optional().describe("The Azure DevOps project name (optional if specified in environment variables)"),
