@@ -1,0 +1,29 @@
+{
+  "name": "azure-devops-search-mcp",
+  "version": "1.0.0",
+  "description": "An MCP server for Azure DevOps search tools",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "mcp",
+    "azure-devops",
+    "search"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^22.13.13",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "axios": "^1.8.4",
+    "azure-devops-node-api": "^14.1.0",
+    "dotenv": "^16.0.0"
+  }
+}
