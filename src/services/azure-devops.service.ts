@@ -93,6 +93,14 @@ export class AzureDevOpsService {
       });
     } catch (error) {
       await this.logger.logError(error);
+      
+      // Enhanced error handling to include HTTP status code and error details
+      if (axios.isAxiosError(error) && error.response) {
+        const statusCode = error.response.status;
+        const errorMessage = error.response.data?.message || error.message;
+        throw new Error(`Wiki search failed with status ${statusCode}: ${errorMessage}`);
+      }
+      
       throw error;
     }
   }
@@ -207,6 +215,14 @@ export class AzureDevOpsService {
       });
     } catch (error) {
       await this.logger.logError(error);
+      
+      // Enhanced error handling to include HTTP status code and error details
+      if (axios.isAxiosError(error) && error.response) {
+        const statusCode = error.response.status;
+        const errorMessage = error.response.data?.message || error.message;
+        throw new Error(`Code search failed with status ${statusCode}: ${errorMessage}`);
+      }
+      
       throw error;
     }
   }
@@ -280,6 +296,14 @@ export class AzureDevOpsService {
       return result;
     } catch (error) {
       await this.logger.logError(error);
+      
+      // Enhanced error handling to include HTTP status code and error details
+      if (axios.isAxiosError(error) && error.response) {
+        const statusCode = error.response.status;
+        const errorMessage = error.response.data?.message || error.message;
+        throw new Error(`Code retrieval failed with status ${statusCode}: ${errorMessage}`);
+      }
+      
       throw error;
     }
   }
