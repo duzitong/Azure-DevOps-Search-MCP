@@ -3,7 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import dotenv from 'dotenv';
 import { AzureDevOpsService } from './services/azure-devops.service.js';
-import { CodeSearchInput } from './types/index.js';
+import { CodeSearchInput, CodeRetrievalInput } from './types/index.js';
 
 // Load environment variables
 dotenv.config();
@@ -77,6 +77,35 @@ server.tool(
       content: [{ 
         type: "text", 
         text: JSON.stringify(results, null, 2)
+      }]
+    };
+  }
+);
+
+// Add Azure DevOps code retrieval tool
+server.tool(
+  "azure_devops_code_retrieval",
+  `Retrieve code from a specific file in ${process.env.PROJECT_FRIENDLY_NAME || 'Azure DevOps'} repositories. Returns the complete file content along with metadata.`,
+  {
+    repository: z.string().describe("The repository name containing the file"),
+    path: z.string().describe("Full path to the file within the repository"),
+    project: z.string().optional().describe("The Azure DevOps project name (optional if specified in environment variables)"),
+    branch: z.string().optional().describe("The branch to retrieve the file from (defaults to 'main')")
+  },
+  async (args, extra) => {
+    // Convert the tool parameters to the format expected by the service
+    const retrievalInput: CodeRetrievalInput = {
+      repository: args.repository,
+      path: args.path,
+      project: args.project,
+      branch: args.branch
+    };
+
+    const result = await azureDevOpsService.retrieveCode(retrievalInput);
+    return {
+      content: [{ 
+        type: "text", 
+        text: JSON.stringify(result, null, 2)
       }]
     };
   }

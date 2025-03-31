@@ -37,6 +37,25 @@ interface CodeSearchInput {
   includeFacets?: boolean;
 }
 
+// New interface for code content retrieval
+interface CodeRetrievalInput {
+  repository: string;
+  path: string;
+  project?: string;
+  branch?: string;
+}
+
+// New interface for code content response
+interface CodeRetrievalResult {
+  repository: string;
+  path: string;
+  content: string;
+  url: string;
+  fileName: string;
+  size: number;
+  commitId?: string;
+}
+
 // Azure DevOps specific types
 export interface WikiSearchResult {
   id: string;
@@ -171,4 +190,4 @@ export interface CodeSearchApiResponse {
   };
 }
 
-export { WikiSearchInput, CodeSearchInput };
+export { WikiSearchInput, CodeSearchInput, CodeRetrievalInput, CodeRetrievalResult };
