@@ -27,7 +27,7 @@ interface WikiSearchInput {
 interface CodeSearchInput {
   query: string;
   project?: string;
-  repository?: string;
+  repository?: string | string[];  // Can be a single repository or an array of repositories
   fileExtensions?: string[];
   maxResults?: number;
   branch?: string;

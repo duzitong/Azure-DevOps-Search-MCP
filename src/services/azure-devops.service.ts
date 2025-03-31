@@ -144,9 +144,13 @@ export class AzureDevOpsService {
 
       // Add repository filter if specified
       if (request.repository) {
+        const repositories = Array.isArray(request.repository) 
+          ? request.repository 
+          : [request.repository];
+        
         requestBody.filters = {
           ...requestBody.filters,
-          Repository: [request.repository]
+          Repository: repositories
         };
       }
 
