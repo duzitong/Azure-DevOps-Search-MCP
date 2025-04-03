@@ -3,7 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import dotenv from 'dotenv';
 import { AzureDevOpsService } from './services/azure-devops.service.js';
-import { CodeSearchInput, CodeRetrievalInput } from './types/index.js';
+import { CodeSearchInput, CodeRetrievalInput, WikiPageInput } from './types/index.js';
 
 // Load environment variables
 dotenv.config();
@@ -36,6 +36,43 @@ server.tool(
       content: [{ 
         type: "text", 
         text: JSON.stringify(results, null, 2)
+      }]
+    };
+  }
+);
+
+// Add Azure DevOps wiki page retrieval tool
+server.tool(
+  "azure_devops_wiki_page",
+  `Retrieve content from a specific wiki page in ${process.env.PROJECT_FRIENDLY_NAME || 'Azure DevOps'}. Returns the complete page content along with metadata and optional subpages.`,
+  {
+    wikiIdentifier: z.string().describe("The wiki name or ID"),
+    path: z.string().describe("Path to the wiki page, including leading '/' (e.g., '/Home')"),
+    project: z.string().optional().describe("The Azure DevOps project name (optional if specified in environment variables)"),
+    includeContent: z.boolean().optional().default(true).describe("Whether to include the content of the page"),
+    recursionLevel: z.enum(['None', 'OneLevel', 'Full']).optional().default('None').describe("The recursion level for retrieving child pages"),
+    versionDescriptor: z.object({
+      version: z.string().optional().describe("Git branch name, commit ID, or tag"),
+      versionType: z.enum(['branch', 'commit', 'tag']).optional().describe("The type of version"),
+      versionOptions: z.enum(['None', 'PreviousChange', 'FirstParent']).optional().describe("Version options")
+    }).optional().describe("Version descriptor for retrieving a specific version of the wiki page")
+  },
+  async (args, extra) => {
+    // Convert the tool parameters to the format expected by the service
+    const wikiPageInput: WikiPageInput = {
+      wikiIdentifier: args.wikiIdentifier,
+      path: args.path,
+      project: args.project,
+      includeContent: args.includeContent,
+      recursionLevel: args.recursionLevel,
+      versionDescriptor: args.versionDescriptor
+    };
+
+    const result = await azureDevOpsService.retrieveWikiPage(wikiPageInput);
+    return {
+      content: [{ 
+        type: "text", 
+        text: JSON.stringify(result, null, 2)
       }]
     };
   }

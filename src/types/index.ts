@@ -24,6 +24,34 @@ interface WikiSearchInput {
   includeFacets?: boolean;  // Optional parameter for including facets in response
 }
 
+// New interface for wiki page retrieval
+interface WikiPageInput {
+  project?: string;
+  wikiIdentifier: string; // Wiki name or ID
+  path: string; // Wiki page path
+  includeContent?: boolean; // Whether to include page content
+  recursionLevel?: string; // Recursion level for retrieving child pages (None, OneLevel, Full)
+  versionDescriptor?: {
+    version?: string; // Git branch name, commit ID, or tag
+    versionType?: string; // Values: branch, commit, tag
+    versionOptions?: string; // Values: None, PreviousChange, FirstParent
+  };
+}
+
+// New interface for wiki page retrieval result
+interface WikiPageResult {
+  id: string;
+  path: string;
+  content: string;
+  url: string;
+  etag: string;
+  isParentPage: boolean;
+  order: number;
+  gitItemPath: string;
+  subPages?: WikiPageResult[];
+  remoteUrl?: string;
+}
+
 interface CodeSearchInput {
   query: string;
   project?: string;
@@ -190,4 +218,4 @@ export interface CodeSearchApiResponse {
   };
 }
 
-export { WikiSearchInput, CodeSearchInput, CodeRetrievalInput, CodeRetrievalResult };
+export { WikiSearchInput, WikiPageInput, WikiPageResult, CodeSearchInput, CodeRetrievalInput, CodeRetrievalResult };

@@ -10,7 +10,9 @@ import {
   CodeSearchApiRequest,
   CodeSearchApiResponse,
   CodeRetrievalInput,
-  CodeRetrievalResult
+  CodeRetrievalResult,
+  WikiPageInput,
+  WikiPageResult
 } from '../types/index.js';
 import { SearchLogger } from './logging/search-logger.service.js';
 
@@ -229,6 +231,119 @@ export class AzureDevOpsService {
       
       throw error;
     }
+  }
+
+  /**
+   * Retrieve wiki page content from Azure DevOps
+   * Using the Wiki Pages API: https://learn.microsoft.com/en-us/rest/api/azure/devops/wiki/pages/get-page?view=azure-devops-rest-7.1
+   */
+  async retrieveWikiPage(request: WikiPageInput): Promise<WikiPageResult> {
+    try {
+      const projectName = request.project || this.project;
+
+      if (!projectName) {
+        throw new Error('Project name is required for wiki page retrieval');
+      }
+
+      if (!request.wikiIdentifier) {
+        throw new Error('Wiki identifier (name or ID) is required for wiki page retrieval');
+      }
+
+      // Build the URL for the Wiki Pages API
+      // Note: The path needs to be encoded properly, as wiki paths can contain spaces and special characters
+      const encodedPath = encodeURIComponent(request.path);
+      const url = `${this.orgUrl}/${projectName}/_apis/wiki/wikis/${request.wikiIdentifier}/pages`;
+      
+      // Set up query parameters
+      const params = new URLSearchParams();
+      params.append('api-version', '7.1');
+      params.append('path', request.path); // Original path for the API
+      
+      // Add includeContent parameter if specified
+      if (request.includeContent !== undefined) {
+        params.append('includeContent', request.includeContent.toString());
+      } else {
+        params.append('includeContent', 'true'); // Default to include content
+      }
+      
+      // Add recursionLevel parameter if specified
+      if (request.recursionLevel) {
+        params.append('recursionLevel', request.recursionLevel);
+      }
+      
+      // Add version descriptor parameters if specified
+      if (request.versionDescriptor) {
+        if (request.versionDescriptor.version) {
+          params.append('versionDescriptor.version', request.versionDescriptor.version);
+        }
+        if (request.versionDescriptor.versionType) {
+          params.append('versionDescriptor.versionType', request.versionDescriptor.versionType);
+        }
+        if (request.versionDescriptor.versionOptions) {
+          params.append('versionDescriptor.versionOptions', request.versionDescriptor.versionOptions);
+        }
+      }
+
+      // Make the API request
+      const response = await axios.get(`${url}?${params.toString()}`, {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Basic ${Buffer.from(`:${this.token}`).toString('base64')}`
+        }
+      });
+
+      // Process sub-pages if they exist
+      const subPages = response.data.subPages ? 
+        response.data.subPages.map((subPage: any) => this.processWikiPageResponse(subPage, projectName, request.wikiIdentifier)) : 
+        undefined;
+
+      // Process and return the wiki page result
+      return {
+        id: response.data.id || '',
+        path: response.data.path || request.path,
+        content: response.data.content || '',
+        url: `${this.orgUrl}/${projectName}/_wiki/wikis/${request.wikiIdentifier}${response.data.path || request.path}`,
+        etag: response.data.eTag || '',
+        isParentPage: response.data.isParentPage || false,
+        order: response.data.order || 0,
+        gitItemPath: response.data.gitItemPath || '',
+        subPages,
+        remoteUrl: response.data.remoteUrl
+      };
+    } catch (error) {
+      await this.logger.logError(error);
+      
+      // Enhanced error handling to include HTTP status code and error details
+      if (axios.isAxiosError(error) && error.response) {
+        const statusCode = error.response.status;
+        const errorMessage = error.response.data?.message || error.message;
+        throw new Error(`Wiki page retrieval failed with status ${statusCode}: ${errorMessage}`);
+      }
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Helper method to process wiki page response data
+   */
+  private processWikiPageResponse(pageData: any, projectName: string, wikiIdentifier: string): WikiPageResult {
+    const subPages = pageData.subPages ? 
+      pageData.subPages.map((subPage: any) => this.processWikiPageResponse(subPage, projectName, wikiIdentifier)) : 
+      undefined;
+
+    return {
+      id: pageData.id || '',
+      path: pageData.path || '',
+      content: pageData.content || '',
+      url: `${this.orgUrl}/${projectName}/_wiki/wikis/${wikiIdentifier}${pageData.path}`,
+      etag: pageData.eTag || '',
+      isParentPage: pageData.isParentPage || false,
+      order: pageData.order || 0,
+      gitItemPath: pageData.gitItemPath || '',
+      subPages,
+      remoteUrl: pageData.remoteUrl
+    };
   }
 
   /**
