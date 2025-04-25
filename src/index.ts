@@ -13,13 +13,21 @@ const azureDevOpsService = new AzureDevOpsService();
 
 // Create an MCP server
 const server = new McpServer({
-  name: process.env.PROJECT_FRIENDLY_NAME || "Azure DevOps Search MCP Server",
+  name: process.env.PROJECT_FRIENDLY_NAME || "Azure DevOps",
   version: "1.0.0"
 });
 
+// Helper to create a tool name prefix from PROJECT_FRIENDLY_NAME
+function getToolPrefix() {
+  const raw = process.env.PROJECT_FRIENDLY_NAME || "Azure DevOps";
+  return raw.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_');
+}
+
+const toolPrefix = getToolPrefix();
+
 // Add Azure DevOps wiki search tool
 server.tool(
-  "azure_devops_wiki_search",
+  `${toolPrefix}_wiki_search`,
   `Online search for content within ${process.env.PROJECT_FRIENDLY_NAME || 'Azure DevOps'} wiki pages. Returns matching wiki pages with their titles, content snippets, paths, and URLs.`,
   {
     query: z.string().describe("The search query"),
@@ -43,7 +51,7 @@ server.tool(
 
 // Add Azure DevOps wiki page retrieval tool
 server.tool(
-  "azure_devops_wiki_page",
+  `${toolPrefix}_wiki_page`,
   `Retrieve content from a specific wiki page in ${process.env.PROJECT_FRIENDLY_NAME || 'Azure DevOps'}. Returns the complete page content along with metadata and optional subpages.`,
   {
     wikiIdentifier: z.string().describe("The wiki name or ID"),
@@ -80,7 +88,7 @@ server.tool(
 
 // Add Azure DevOps code search tool
 server.tool(
-  "azure_devops_code_search",
+  `${toolPrefix}_code_search`,
   `Online search for code within ${process.env.PROJECT_FRIENDLY_NAME || 'Azure DevOps'} repositories. Returns matching code snippets with file paths, repository information, and direct URLs to the code.`,
   {
     query: z.string().describe("The search query"),
@@ -121,7 +129,7 @@ server.tool(
 
 // Add Azure DevOps code retrieval tool
 server.tool(
-  "azure_devops_code_retrieval",
+  `${toolPrefix}_code_retrieval`,
   `Retrieve code from a specific file in ${process.env.PROJECT_FRIENDLY_NAME || 'Azure DevOps'} repositories. Returns the complete file content along with metadata.`,
   {
     repository: z.string().describe("The repository name containing the file"),
